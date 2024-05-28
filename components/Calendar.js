@@ -1,5 +1,5 @@
 import { useState } from "react";
-import React from "react";
+import React, { Fragment } from "react";
 import {
   format,
   startOfMonth,
@@ -20,20 +20,22 @@ function classNames(...classes) {
 
 const Calendar = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedRange, setSelectedRange] = useState({
+    start: null,
+    end: null,
+  });
   const [events, setEvents] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newEvent, setNewEvent] = useState({ name: "", date: "", time: "" });
 
   const renderHeader = () => {
     const dateFormat = "MMMM yyyy";
-
     return (
       <div className="flex items-center text-gray-900 mb-4">
         <button
           type="button"
           className="-m-1.5 flex flex-none items-center justify-center p-1.5 text-gray-400 hover:text-gray-500"
-          onClick={prevMonth}
+          onClick={() => setCurrentMonth(addMonths(currentMonth, -1))}
         >
           <span className="sr-only">Previous month</span>
           <ChevronLeftIcon className="h-5 w-5" aria-hidden="true" />
@@ -44,7 +46,7 @@ const Calendar = () => {
         <button
           type="button"
           className="-m-1.5 flex flex-none items-center justify-center p-1.5 text-gray-400 hover:text-gray-500"
-          onClick={nextMonth}
+          onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
         >
           <span className="sr-only">Next month</span>
           <ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
@@ -56,7 +58,6 @@ const Calendar = () => {
   const renderDays = () => {
     const dateFormat = "EEE";
     const days = [];
-
     let startDate = startOfWeek(currentMonth);
 
     for (let i = 0; i < 7; i++) {
@@ -69,7 +70,6 @@ const Calendar = () => {
 
     return <div className="grid grid-cols-7 mb-2">{days}</div>;
   };
-
   const renderCells = () => {
     const monthStart = startOfMonth(currentMonth);
     const monthEnd = endOfMonth(monthStart);
@@ -85,7 +85,13 @@ const Calendar = () => {
       for (let i = 0; i < 7; i++) {
         formattedDate = format(day, "d");
         const cloneDay = day;
-        const dayIdx = days.length;
+
+        const isSelected =
+          selectedRange.start &&
+          (isSameDay(day, selectedRange.start) ||
+            (selectedRange.end &&
+              day >= selectedRange.start &&
+              day <= selectedRange.end));
 
         days.push(
           <button
@@ -94,48 +100,27 @@ const Calendar = () => {
             className={classNames(
               "py-1.5 hover:bg-gray-100 focus:z-10",
               isSameMonth(day, monthStart) ? "bg-white" : "bg-gray-50",
-              (isSameDay(day, selectedDate) || isSameDay(day, new Date())) &&
-                "font-semibold",
-              isSameDay(day, selectedDate) && "text-white",
-              !isSameDay(day, selectedDate) &&
+              (isSelected || isSameDay(day, new Date())) && "font-semibold",
+              isSelected && "text-black",
+              !isSelected &&
                 isSameMonth(day, monthStart) &&
                 !isSameDay(day, new Date()) &&
                 "text-gray-900",
-              !isSameDay(day, selectedDate) &&
+              !isSelected &&
                 !isSameMonth(day, monthStart) &&
                 !isSameDay(day, new Date()) &&
                 "text-gray-400",
-              isSameDay(day, new Date()) &&
-                !isSameDay(day, selectedDate) &&
-                "text-indigo-600",
-              dayIdx === 0 && "rounded-tl-lg",
-              dayIdx === 6 && "rounded-tr-lg",
-              dayIdx === days.length - 7 && "rounded-bl-lg",
-              dayIdx === days.length - 1 && "rounded-br-lg"
+              isSameDay(day, new Date()) && !isSelected && "text-indigo-600",
+              isSelected && "bg-indigo-600" // Add this line to change the background color of the selected range
             )}
             onClick={() => onDateClick(cloneDay)}
           >
             <time
               dateTime={format(day, "yyyy-MM-dd")}
-              className={classNames(
-                "mx-auto flex h-7 w-7 items-center justify-center rounded-full",
-                isSameDay(day, selectedDate) &&
-                  isSameDay(day, new Date()) &&
-                  "bg-indigo-600",
-                isSameDay(day, selectedDate) &&
-                  !isSameDay(day, new Date()) &&
-                  "bg-gray-900"
-              )}
+              className="mx-auto flex h-7 w-7 items-center justify-center rounded-full"
             >
               {formattedDate}
             </time>
-            {events
-              .filter((event) => isSameDay(new Date(event.date), day))
-              .map((event, idx) => (
-                <div key={idx} className="mt-1 text-xs text-gray-600">
-                  {event.name}
-                </div>
-              ))}
           </button>
         );
         day = addDays(day, 1);
@@ -152,21 +137,21 @@ const Calendar = () => {
   };
 
   const onDateClick = (day) => {
-    setSelectedDate(day);
-  };
-
-  const nextMonth = () => {
-    setCurrentMonth(addMonths(currentMonth, 1));
-  };
-
-  const prevMonth = () => {
-    setCurrentMonth(addMonths(currentMonth, -1));
+    if (!selectedRange.start || (selectedRange.start && selectedRange.end)) {
+      setSelectedRange({ start: day, end: null });
+    } else if (selectedRange.start && !selectedRange.end) {
+      if (day < selectedRange.start) {
+        setSelectedRange({ start: day, end: selectedRange.start });
+      } else {
+        setSelectedRange({ ...selectedRange, end: day });
+      }
+    }
   };
 
   const handleAddEvent = () => {
     setEvents([
       ...events,
-      { ...newEvent, date: format(selectedDate, "yyyy-MM-dd") },
+      { ...newEvent, date: format(selectedRange.start, "yyyy-MM-dd") },
     ]);
     setNewEvent({ name: "", date: "", time: "" });
     setIsModalOpen(false);
@@ -184,6 +169,28 @@ const Calendar = () => {
       >
         Add event
       </button>
+
+      {/* Event List */}
+      <div className="mt-8">
+        <h2 className="text-base font-semibold leading-6 text-gray-900">
+          Upcoming events
+        </h2>
+        <ul className="mt-4 space-y-4">
+          {events.map((event, index) => (
+            <li key={index} className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {event.name}
+                </h3>
+                <p className="text-sm text-gray-600">
+                  {format(new Date(event.date), "MMMM d, yyyy")}
+                </p>
+                <p className="text-sm text-gray-600">{event.time}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
 
       {/* Modal for adding event */}
       <Transition show={isModalOpen} as={React.Fragment}>
