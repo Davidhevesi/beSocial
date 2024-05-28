@@ -1,4 +1,5 @@
 import { useState } from "react";
+import React from "react";
 import {
   format,
   startOfMonth,
@@ -11,6 +12,7 @@ import {
   addMonths,
 } from "date-fns";
 import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/20/solid";
+import { Dialog, Transition } from "@headlessui/react";
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(" ");
@@ -19,12 +21,15 @@ function classNames(...classes) {
 const Calendar = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [events, setEvents] = useState([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newEvent, setNewEvent] = useState({ name: "", date: "", time: "" });
 
   const renderHeader = () => {
     const dateFormat = "MMMM yyyy";
 
     return (
-      <div className="flex items-center text-gray-900 mb-4 p-6">
+      <div className="flex items-center text-gray-900 mb-4">
         <button
           type="button"
           className="-m-1.5 flex flex-none items-center justify-center p-1.5 text-gray-400 hover:text-gray-500"
@@ -124,6 +129,13 @@ const Calendar = () => {
             >
               {formattedDate}
             </time>
+            {events
+              .filter((event) => isSameDay(new Date(event.date), day))
+              .map((event, idx) => (
+                <div key={idx} className="mt-1 text-xs text-gray-600">
+                  {event.name}
+                </div>
+              ))}
           </button>
         );
         day = addDays(day, 1);
@@ -151,17 +163,85 @@ const Calendar = () => {
     setCurrentMonth(addMonths(currentMonth, -1));
   };
 
+  const handleAddEvent = () => {
+    setEvents([
+      ...events,
+      { ...newEvent, date: format(selectedDate, "yyyy-MM-dd") },
+    ]);
+    setNewEvent({ name: "", date: "", time: "" });
+    setIsModalOpen(false);
+  };
+
   return (
-    <div className="p-6">
+    <div>
       {renderHeader()}
       {renderDays()}
       {renderCells()}
       <button
         type="button"
         className="mt-8 w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+        onClick={() => setIsModalOpen(true)}
       >
         Add event
       </button>
+
+      {/* Modal for adding event */}
+      <Transition show={isModalOpen} as={React.Fragment}>
+        <Dialog
+          as="div"
+          className="fixed inset-0 z-10 overflow-y-auto"
+          onClose={() => setIsModalOpen(false)}
+        >
+          <div className="flex items-center justify-center min-h-screen px-4 text-center">
+            <Transition.Child
+              as={React.Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 scale-95"
+              enterTo="opacity-100 scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 scale-100"
+              leaveTo="opacity-0 scale-95"
+            >
+              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                <Dialog.Title
+                  as="h3"
+                  className="text-lg font-medium leading-6 text-gray-900"
+                >
+                  Add New Event
+                </Dialog.Title>
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    placeholder="Event Name"
+                    value={newEvent.name}
+                    onChange={(e) =>
+                      setNewEvent({ ...newEvent, name: e.target.value })
+                    }
+                    className="w-full px-4 py-2 border rounded-md"
+                  />
+                  <input
+                    type="time"
+                    value={newEvent.time}
+                    onChange={(e) =>
+                      setNewEvent({ ...newEvent, time: e.target.value })
+                    }
+                    className="w-full mt-2 px-4 py-2 border rounded-md"
+                  />
+                </div>
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    className="inline-flex justify-center w-full rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    onClick={handleAddEvent}
+                  >
+                    Add Event
+                  </button>
+                </div>
+              </Dialog.Panel>
+            </Transition.Child>
+          </div>
+        </Dialog>
+      </Transition>
     </div>
   );
 };
